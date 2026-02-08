@@ -1,10 +1,12 @@
 ---
 name: antfarm-workflows
-description: Plan and execute multi-agent workflows with Antfarm. Use when user requests a complex task that benefits from multiple specialized agents.
+description: Plan and execute multi-agent workflows with Antfarm. Use when user mentions antfarm, asks to run a workflow, or requests a complex task that benefits from multiple specialized agents. MUST be loaded before running any antfarm command.
 user-invocable: false
 ---
 
 # Antfarm Workflows
+
+> **STOP.** Do NOT run any antfarm workflow without completing Steps 1-3 below. Vague tasks produce bad results. Your job is to clarify, plan, and get approval BEFORE launching.
 
 Antfarm runs multi-agent workflows on OpenClaw. Each workflow defines a pipeline of agents (e.g. developer -> verifier -> tester -> reviewer) that execute autonomously via cron jobs polling a shared SQLite database.
 
