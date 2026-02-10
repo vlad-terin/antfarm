@@ -1,0 +1,328 @@
+id: deals-pipeline
+name: Sales Deals Pipeline
+version: 1
+description: |
+  Sales pipeline that finds, qualifies, researches, and creates outreach for potential customers.
+  Targets: Rapido (Accredo ERP), DroneTrust (drone training), POtoOrder (Shopify PO automation),
+  VocHub (Google reviews), OpenClaw Academy (AI agent training).
+  Human reviews all output before anything gets sent.
+
+agents:
+  - id: researcher
+    name: Researcher
+    role: scanning
+    description: Identifies 20-30 potential companies using web search and LinkedIn via Mac node browser.
+    tools:
+      alsoAllow: ["nodes", "browser", "web_search", "web_fetch", "web_search_v2"]
+      removeDeny: ["nodes"]
+    workspace:
+      baseDir: agents/researcher
+      files:
+        AGENTS.md: agents/researcher/AGENTS.md
+        SOUL.md: agents/researcher/SOUL.md
+        IDENTITY.md: agents/researcher/IDENTITY.md
+
+  - id: qualifier
+    name: Qualifier
+    role: scanning
+    description: Scores and filters leads based on pain signals and fit.
+    tools:
+      alsoAllow: ["web_search", "web_fetch", "web_search_v2"]
+    workspace:
+      baseDir: agents/qualifier
+      files:
+        AGENTS.md: agents/qualifier/AGENTS.md
+        SOUL.md: agents/qualifier/SOUL.md
+        IDENTITY.md: agents/qualifier/IDENTITY.md
+
+  - id: intel
+    name: Intel
+    role: scanning
+    description: Deep dives on each qualified lead using browser for LinkedIn and company research.
+    tools:
+      alsoAllow: ["nodes", "browser", "web_search", "web_fetch", "web_search_v2"]
+      removeDeny: ["nodes"]
+    workspace:
+      baseDir: agents/intel
+      files:
+        AGENTS.md: agents/intel/AGENTS.md
+        SOUL.md: agents/intel/SOUL.md
+        IDENTITY.md: agents/intel/IDENTITY.md
+
+  - id: strategist
+    name: Strategist
+    role: analysis
+    description: Crafts personalized sales angles per lead based on intel.
+    workspace:
+      baseDir: agents/strategist
+      files:
+        AGENTS.md: agents/strategist/AGENTS.md
+        SOUL.md: agents/strategist/SOUL.md
+        IDENTITY.md: agents/strategist/IDENTITY.md
+
+  - id: writer
+    name: Writer
+    role: coding
+    description: Drafts personalized email and LinkedIn outreach messages.
+    workspace:
+      baseDir: agents/writer
+      files:
+        AGENTS.md: agents/writer/AGENTS.md
+        SOUL.md: agents/writer/SOUL.md
+        IDENTITY.md: agents/writer/IDENTITY.md
+
+  - id: reviewer
+    name: Reviewer
+    role: coding
+    description: Compiles everything into a final deals report for human review.
+    workspace:
+      baseDir: agents/reviewer
+      files:
+        AGENTS.md: agents/reviewer/AGENTS.md
+        SOUL.md: agents/reviewer/SOUL.md
+        IDENTITY.md: agents/reviewer/IDENTITY.md
+
+steps:
+  - id: research
+    agent: researcher
+    input: |
+      Research and identify 20-30 potential customer companies for the specified platform and vertical.
+
+      TARGET PLATFORM & VERTICAL:
+      {{task}}
+
+      PLATFORMS WE SELL:
+      - Rapido: B2B portal for Accredo ERP users — target NZ businesses using Accredo
+      - DroneTrust: drone training platform — target drone operators, ag companies, construction, surveying firms
+      - POtoOrder: PO automation + Shopify integration — target Shopify merchants with manual purchase order processes
+      - VocHub: Google reviews dashboard — target franchises, multi-location retailers, agencies
+      - OpenClaw Academy: AI agent training — target developers, tech leads, AI enthusiasts
+
+      Instructions:
+      1. Identify which platform from the list above matches the task (or run all if "all platforms")
+      2. Use web search to find companies in New Zealand (and optionally AU) matching the target profile
+      3. Use the Mac node browser to search LinkedIn for company pages and key decision makers
+      4. For each company gather: name, website, estimated size, industry vertical, key contacts (name + role), LinkedIn URLs
+      5. Aim for 20-30 companies — quality over quantity
+      6. Save the full company list to /home/adam/agents/shared/deals-pipeline/research-output.md
+
+      Reply with:
+      STATUS: done
+      COMPANY_COUNT: <number>
+      PLATFORM: <which platform(s) targeted>
+      COMPANIES_FILE: /home/adam/agents/shared/deals-pipeline/research-output.md
+      SUMMARY: brief overview of what was found
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: qualify
+    agent: qualifier
+    input: |
+      Score and filter the researched leads down to the top 10.
+
+      TASK:
+      {{task}}
+
+      PLATFORM: {{platform}}
+      COMPANY_COUNT: {{company_count}}
+      COMPANIES_FILE: {{companies_file}}
+
+      Instructions:
+      1. Read the research output file
+      2. For each company, check their website for pain signals:
+         - Manual processes that our platform automates
+         - Outdated technology or workflows
+         - Growth indicators (hiring, expanding, new locations)
+         - Existing tech stack compatibility
+      3. Score each lead 1-100 based on:
+         - FIT (30%): How well does our platform solve their problem?
+         - PAIN (30%): How acute is their current pain?
+         - SIZE (20%): Are they big enough to pay but small enough to decide fast?
+         - ACCESS (20%): Can we reach decision makers?
+      4. Rank and select the top 10 qualified leads
+      5. Save to /home/adam/agents/shared/deals-pipeline/qualified-leads.md
+
+      Reply with:
+      STATUS: done
+      QUALIFIED_COUNT: <number>
+      QUALIFIED_FILE: /home/adam/agents/shared/deals-pipeline/qualified-leads.md
+      TOP_LEAD: <name and score of #1 lead>
+      SUMMARY: brief overview of qualification results
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: intel
+    agent: intel
+    type: loop
+    loop:
+      over: stories
+      completion: all_done
+      fresh_session: true
+    input: |
+      Deep dive research on a single qualified lead. Build a complete intelligence dossier.
+
+      TASK (overall):
+      {{task}}
+
+      PLATFORM: {{platform}}
+      QUALIFIED_FILE: {{qualified_file}}
+
+      CURRENT STORY:
+      {{current_story}}
+
+      COMPLETED STORIES:
+      {{completed_stories}}
+
+      STORIES REMAINING: {{stories_remaining}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Instructions:
+      1. Focus on this ONE lead only
+      2. Use the Mac node browser to research their LinkedIn company page and key people's profiles
+      3. Use web search for recent news, press releases, job listings, tech blog posts
+      4. Build a dossier covering:
+         - Decision makers: names, roles, LinkedIn profiles, recent activity
+         - Tech stack: what tools/platforms they currently use
+         - Pain points: specific problems our platform could solve
+         - Recent news: funding, expansion, leadership changes, partnerships
+         - LinkedIn activity: what are key people posting/engaging with?
+         - Company culture: values, communication style
+      5. Save dossier to /home/adam/agents/shared/deals-pipeline/dossiers/<company-slug>.md
+
+      Reply with:
+      STATUS: done
+      COMPANY: <company name>
+      DECISION_MAKERS: <key contacts found>
+      DOSSIER_FILE: <path to saved dossier>
+      KEY_INSIGHT: <most actionable finding>
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: strategy
+    agent: strategist
+    input: |
+      Craft personalized sales strategies for each qualified lead based on intel dossiers.
+
+      TASK:
+      {{task}}
+
+      PLATFORM: {{platform}}
+      QUALIFIED_FILE: {{qualified_file}}
+
+      Instructions:
+      1. Read each dossier from /home/adam/agents/shared/deals-pipeline/dossiers/
+      2. For each lead, create a sales strategy covering:
+         - Pitch angle: what specific problem do we lead with?
+         - Value proposition: quantified if possible (save X hours, reduce Y% errors)
+         - Objection handling: top 3 likely objections and responses
+         - Recommended approach: email first vs LinkedIn vs cold call vs warm intro
+         - Timing: any triggers that make NOW the right time?
+         - Personalisation hooks: shared connections, recent posts to reference, mutual interests
+      3. Save all strategies to /home/adam/agents/shared/deals-pipeline/strategies.md
+
+      Reply with:
+      STATUS: done
+      STRATEGIES_FILE: /home/adam/agents/shared/deals-pipeline/strategies.md
+      LEADS_COVERED: <number>
+      BEST_OPPORTUNITY: <which lead has highest conversion potential and why>
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: outreach
+    agent: writer
+    type: loop
+    loop:
+      over: stories
+      completion: all_done
+      fresh_session: true
+    input: |
+      Draft personalized outreach messages for a single lead. You are working on ONE lead in a fresh session.
+
+      TASK (overall):
+      {{task}}
+
+      PLATFORM: {{platform}}
+      STRATEGIES_FILE: {{strategies_file}}
+
+      CURRENT STORY:
+      {{current_story}}
+
+      COMPLETED STORIES:
+      {{completed_stories}}
+
+      STORIES REMAINING: {{stories_remaining}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Instructions:
+      1. Read this lead's dossier and strategy
+      2. Draft TWO pieces of outreach:
+         a. EMAIL: Subject line + body. Professional but warm NZ business tone. Not salesy.
+            Reference something specific about them. Clear value prop. Soft CTA.
+         b. LINKEDIN MESSAGE: Short connection request note OR InMail.
+            Reference a specific post/activity. Genuine interest. Under 300 chars for connection note.
+      3. Both should feel like they came from a human who actually researched the company
+      4. Save to /home/adam/agents/shared/deals-pipeline/outreach/<company-slug>.md
+
+      NZ TONE GUIDELINES:
+      - Direct but friendly, not aggressive American sales style
+      - "Keen to chat" not "I'd love to schedule a call"
+      - Reference local context (NZ market, industry events)
+      - No "circle back" or "touch base" — keep it real
+
+      Reply with:
+      STATUS: done
+      COMPANY: <company name>
+      OUTREACH_FILE: <path to saved outreach>
+      EMAIL_SUBJECT: <the email subject line>
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: review
+    agent: reviewer
+    input: |
+      Compile everything into a final deals pipeline report for human review.
+
+      TASK:
+      {{task}}
+
+      PLATFORM: {{platform}}
+
+      Instructions:
+      1. Read all files from /home/adam/agents/shared/deals-pipeline/
+      2. Compile a comprehensive report with:
+         - Executive summary: platforms targeted, leads found, qualified, outreach drafted
+         - Lead scorecard: table of all qualified leads with scores
+         - Per-lead section: dossier summary + strategy + draft outreach (email + LinkedIn)
+         - Recommended priority order for outreach
+         - Gaps or concerns flagged for human review
+         - Next steps checklist
+      3. Save the final report to /home/adam/agents/shared/deals-pipeline/DEALS-REPORT.md
+      4. Also create a quick-reference CSV at /home/adam/agents/shared/deals-pipeline/leads.csv
+
+      IMPORTANT: This report is for HUMAN REVIEW. Nothing gets sent without Adam's approval.
+
+      Reply with:
+      STATUS: done
+      REPORT_FILE: /home/adam/agents/shared/deals-pipeline/DEALS-REPORT.md
+      CSV_FILE: /home/adam/agents/shared/deals-pipeline/leads.csv
+      TOTAL_LEADS: <number>
+      READY_FOR_OUTREACH: <number with complete outreach drafts>
+      SUMMARY: brief overview of the pipeline results
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human

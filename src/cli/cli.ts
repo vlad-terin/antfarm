@@ -6,6 +6,7 @@ import { runWorkflow } from "../installer/run.js";
 import { listBundledWorkflows } from "../installer/workflow-fetch.js";
 import { readRecentLogs } from "../lib/logger.js";
 import { startDaemon, stopDaemon, getDaemonStatus, isRunning } from "../server/daemonctl.js";
+import { startSpawnerDaemon, stopSpawnerDaemon, getSpawnerStatus, isSpawnerRunning } from "../daemon/daemonctl.js";
 import { claimStep, completeStep, failStep, getStories } from "../installer/step-ops.js";
 import { ensureCliSymlink } from "../installer/symlink.js";
 import { execSync } from "node:child_process";
@@ -44,6 +45,10 @@ function printUsage() {
       "antfarm dashboard [start] [--port N]   Start dashboard daemon (default: 3333)",
       "antfarm dashboard stop                  Stop dashboard daemon",
       "antfarm dashboard status                Check dashboard status",
+      "",
+      "antfarm spawner start [--interval N]   Start event-driven spawner daemon (default: 30s)",
+      "antfarm spawner stop                    Stop spawner daemon",
+      "antfarm spawner status                  Check spawner status",
       "",
       "antfarm step claim <agent-id>       Claim pending step, output resolved input as JSON",
       "antfarm step complete <step-id>      Complete step (reads output from stdin)",
@@ -440,18 +445,43 @@ async function main() {
 
   if (action === "run") {
     let notifyUrl: string | undefined;
+    let scheduler: "cron" | "daemon" | undefined;
     const runArgs = args.slice(3);
     const nuIdx = runArgs.indexOf("--notify-url");
     if (nuIdx !== -1) {
       notifyUrl = runArgs[nuIdx + 1];
       runArgs.splice(nuIdx, 2);
     }
+    const schedIdx = runArgs.indexOf("--scheduler");
+    if (schedIdx !== -1) {
+      scheduler = runArgs[schedIdx + 1] as "cron" | "daemon";
+      runArgs.splice(schedIdx, 2);
+    }
+    if (runArgs.includes("--use-daemon")) {
+      scheduler = "daemon";
+      runArgs.splice(runArgs.indexOf("--use-daemon"), 1);
+    }
     const taskTitle = runArgs.join(" ").trim();
     if (!taskTitle) { process.stderr.write("Missing task title.\n"); printUsage(); process.exit(1); }
-    const run = await runWorkflow({ workflowId: target, taskTitle, notifyUrl });
+    const run = await runWorkflow({ workflowId: target, taskTitle, notifyUrl, scheduler });
     process.stdout.write(
       [`Run: ${run.id}`, `Workflow: ${run.workflowId}`, `Task: ${run.task}`, `Status: ${run.status}`].join("\n") + "\n",
     );
+
+    // If daemon scheduler, ensure spawner is running
+    if (scheduler === "daemon") {
+      const st = getSpawnerStatus();
+      if (!st.running) {
+        try {
+          const result = await startSpawnerDaemon();
+          console.log(`Spawner daemon started (PID ${result.pid})`);
+        } catch (err) {
+          console.log(`Warning: Could not start spawner: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } else {
+        console.log(`Spawner daemon already running (PID ${st.pid})`);
+      }
+    }
     return;
   }
 
