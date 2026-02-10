@@ -172,25 +172,28 @@ async function spawnSession(step: PendingStep): Promise<void> {
   if (gateway.token) headers["Authorization"] = `Bearer ${gateway.token}`;
 
   try {
-    const response = await fetch(`${gateway.url}/sessions`, {
+    // Use chatCompletions endpoint — fire-and-forget
+    // The session will run the agent prompt, which calls `step claim` then does work
+    const response = await fetch(`${gateway.url}/v1/chat/completions`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        agentId: step.agent_id,
-        target: "isolated",
-        message: prompt,
+        model: "anthropic/claude-sonnet-4-20250514",
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
       }),
     });
 
     if (!response.ok) {
       const text = await response.text();
       log(`Failed to spawn session for ${step.agent_id} (step ${step.id.slice(0, 8)}): ${response.status} ${text}`);
+      activeSessions.delete(step.id);
       return;
     }
 
-    const result = await response.json() as { sessionId?: string };
-    activeSessions.set(step.id, { sessionId: result.sessionId, spawnedAt: Date.now() });
-    log(`Spawned session for ${step.agent_id} step=${step.id.slice(0, 8)}${result.sessionId ? ` session=${result.sessionId}` : ""}`);
+    // Consume response body (we don't need it, session already ran)
+    await response.text();
+    log(`Session completed for ${step.agent_id} step=${step.id.slice(0, 8)}`);
   } catch (err) {
     log(`Error spawning session for ${step.agent_id}: ${err}`);
   }

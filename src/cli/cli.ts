@@ -6,7 +6,7 @@ import { runWorkflow } from "../installer/run.js";
 import { listBundledWorkflows } from "../installer/workflow-fetch.js";
 import { readRecentLogs } from "../lib/logger.js";
 import { startDaemon, stopDaemon, getDaemonStatus, isRunning } from "../server/daemonctl.js";
-import { startSpawnerDaemon, stopSpawnerDaemon, getSpawnerStatus, isSpawnerRunning } from "../daemon/daemonctl.js";
+import { startSpawnerDaemon, stopSpawnerDaemon, getSpawnerStatus, getSpawnerLogFile } from "../daemon/daemonctl.js";
 import { claimStep, completeStep, failStep, getStories } from "../installer/step-ops.js";
 import { ensureCliSymlink } from "../installer/symlink.js";
 import { execSync } from "node:child_process";
@@ -200,6 +200,49 @@ async function main() {
     const result = await startDaemon(port);
     console.log(`Dashboard started (PID ${result.pid})`);
     console.log(`  http://localhost:${result.port}`);
+    return;
+  }
+
+  if (group === "spawner") {
+    const sub = args[1];
+
+    if (sub === "stop") {
+      if (stopSpawnerDaemon()) {
+        console.log("Spawner daemon stopped.");
+      } else {
+        console.log("Spawner daemon is not running.");
+      }
+      return;
+    }
+
+    if (sub === "status") {
+      const st = getSpawnerStatus();
+      if (st.running) {
+        console.log(`Spawner daemon running (PID ${st.pid})`);
+        console.log(`  Log: ${getSpawnerLogFile()}`);
+      } else {
+        console.log("Spawner daemon is not running.");
+      }
+      return;
+    }
+
+    // start (explicit or implicit)
+    let intervalMs = 30000;
+    const intIdx = args.indexOf("--interval");
+    if (intIdx !== -1 && args[intIdx + 1]) {
+      intervalMs = parseInt(args[intIdx + 1], 10) * 1000 || 30000;
+    }
+
+    const st = getSpawnerStatus();
+    if (st.running) {
+      console.log(`Spawner daemon already running (PID ${st.pid})`);
+      return;
+    }
+
+    const result = await startSpawnerDaemon(intervalMs);
+    console.log(`Spawner daemon started (PID ${result.pid})`);
+    console.log(`  Poll interval: ${intervalMs / 1000}s`);
+    console.log(`  Log: ${getSpawnerLogFile()}`);
     return;
   }
 

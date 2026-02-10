@@ -32,7 +32,7 @@ export function isSpawnerRunning(): { running: true; pid: number } | { running: 
   }
 }
 
-export async function startSpawnerDaemon(): Promise<{ pid: number }> {
+export async function startSpawnerDaemon(pollIntervalMs = 30000): Promise<{ pid: number }> {
   const status = isSpawnerRunning();
   if (status.running) {
     return { pid: status.pid };
@@ -46,14 +46,14 @@ export async function startSpawnerDaemon(): Promise<{ pid: number }> {
   const err = fs.openSync(logFile, "a");
 
   const daemonScript = path.resolve(__dirname, "daemon.js");
-  const child = spawn("node", [daemonScript], {
+  const child = spawn("node", [daemonScript, String(pollIntervalMs)], {
     detached: true,
     stdio: ["ignore", out, err],
   });
   child.unref();
 
-  // Wait 1s then confirm
-  await new Promise((r) => setTimeout(r, 1000));
+  // Wait 1.5s then confirm
+  await new Promise((r) => setTimeout(r, 1500));
 
   const check = isSpawnerRunning();
   if (!check.running) {
