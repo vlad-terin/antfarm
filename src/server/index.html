@@ -162,8 +162,8 @@ select:focus{outline:none;border-color:#8ECFC0}
 /* ── Cards ─────────────────────────────────────────────────────── */
 .card{background:var(--bg-surface-alt);border:1px solid var(--border);border-radius:6px;padding:12px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .card:hover{border-color:var(--accent-orange);box-shadow:0 2px 8px var(--accent-orange-subtle)}
-.card-title{font-size:13px;font-weight:500;color:var(--text-primary);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card-meta{font-size:11px;color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center}
+.card-title{font-size:var(--text-base);line-height:var(--leading-tight);font-weight:500;color:var(--text-primary);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-meta{font-size:var(--text-sm);color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center}
 .card.done{border-left:3px solid var(--accent-green)}
 .card.failed,.card.error{border-left:3px solid var(--accent-orange)}
 
@@ -192,7 +192,7 @@ select:focus{outline:none;border-color:#8ECFC0}
 .step-status{font-size:11px;text-transform:uppercase;font-weight:600}
 
 /* ── Badges ────────────────────────────────────────────────────── */
-.badge{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;text-transform:uppercase}
+.badge{font-size:var(--text-xs);font-weight:600;padding:2px 6px;border-radius:4px;text-transform:uppercase}
 .badge-running{background:var(--accent-teal-subtle);color:var(--accent-teal)}
 .badge-done,.badge-completed{background:var(--accent-green-subtle);color:var(--accent-green)}
 .badge-failed,.badge-error{background:var(--accent-orange-subtle);color:var(--accent-orange)}
@@ -201,7 +201,7 @@ select:focus{outline:none;border-color:#8ECFC0}
 .badge-blocked{background:var(--accent-orange-faint);color:var(--accent-orange)}
 
 /* ── Misc ──────────────────────────────────────────────────────── */
-.empty{color:var(--text-secondary);font-size:12px;text-align:center;padding:24px 8px}
+.empty{color:var(--text-secondary);font-size:var(--text-sm);text-align:center;padding:24px 8px}
 .refresh-note{color:rgba(255,255,255,.6);font-size:var(--text-sm);margin-left:auto}
 @media(max-width:768px){.board{flex-direction:column}.column{min-width:unset}}
 .story-open{display:block!important}
