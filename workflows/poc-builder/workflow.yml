@@ -1,0 +1,309 @@
+id: poc-builder
+name: POC Builder Workflow
+version: 1
+description: |
+  Takes an idea and builds a working proof-of-concept.
+  Researcher validates the idea and checks feasibility.
+  Architect designs the minimal viable approach.
+  Builder implements the POC with working code.
+  Reviewer verifies it actually works and reports results.
+
+agents:
+  - id: researcher
+    name: Researcher
+    role: analysis
+    description: Validates the idea, checks existing solutions, identifies tech approach.
+    workspace:
+      baseDir: agents/researcher
+      files:
+        AGENTS.md: agents/researcher/AGENTS.md
+        SOUL.md: agents/researcher/SOUL.md
+        IDENTITY.md: agents/researcher/IDENTITY.md
+
+  - id: architect
+    name: Architect
+    role: analysis
+    description: Designs the minimal POC architecture and creates the build plan.
+    workspace:
+      baseDir: agents/architect
+      files:
+        AGENTS.md: agents/architect/AGENTS.md
+        SOUL.md: agents/architect/SOUL.md
+        IDENTITY.md: agents/architect/IDENTITY.md
+
+  - id: setup
+    name: Setup
+    role: coding
+    description: Prepares the repo and dev environment.
+    workspace:
+      baseDir: agents/setup
+      files:
+        AGENTS.md: ../../agents/shared/setup/AGENTS.md
+        SOUL.md: ../../agents/shared/setup/SOUL.md
+        IDENTITY.md: ../../agents/shared/setup/IDENTITY.md
+
+  - id: builder
+    name: Builder
+    role: coding
+    description: Implements the POC in incremental stories.
+    workspace:
+      baseDir: agents/builder
+      files:
+        AGENTS.md: agents/builder/AGENTS.md
+        SOUL.md: agents/builder/SOUL.md
+        IDENTITY.md: agents/builder/IDENTITY.md
+
+  - id: verifier
+    name: Verifier
+    role: verification
+    description: Quick sanity check after each story.
+    workspace:
+      baseDir: agents/verifier
+      files:
+        AGENTS.md: ../../agents/shared/verifier/AGENTS.md
+        SOUL.md: ../../agents/shared/verifier/SOUL.md
+        IDENTITY.md: ../../agents/shared/verifier/IDENTITY.md
+
+  - id: reviewer
+    name: Reviewer
+    role: analysis
+    description: Tests the final POC end-to-end and writes up results.
+    workspace:
+      baseDir: agents/reviewer
+      files:
+        AGENTS.md: agents/reviewer/AGENTS.md
+        SOUL.md: agents/reviewer/SOUL.md
+        IDENTITY.md: agents/reviewer/IDENTITY.md
+
+steps:
+  - id: research
+    agent: researcher
+    input: |
+      Research and validate this POC idea. Determine feasibility and the best technical approach.
+
+      IDEA:
+      {{task}}
+
+      Instructions:
+      1. Understand what's being asked — what problem does this solve?
+      2. Search for existing solutions, competitors, open-source alternatives
+      3. Identify the simplest possible tech stack to prove this works
+      4. Flag any showstoppers (API limitations, cost, complexity)
+      5. Define what "working POC" looks like — the demo scenario
+
+      Reply with:
+      STATUS: done
+      FEASIBILITY: high/medium/low
+      TECH_STACK: what to build with (be specific — framework, language, key libraries)
+      EXISTING: similar tools/projects found (if any)
+      DEMO_SCENARIO: what the POC should demonstrate when complete
+      SHOWSTOPPERS: any blockers (or "none")
+      NOTES: key findings and recommendations
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: architect
+    agent: architect
+    input: |
+      Design the minimal architecture for this POC and break it into buildable stories.
+
+      IDEA:
+      {{task}}
+
+      RESEARCH FINDINGS:
+      Tech Stack: {{tech_stack}}
+      Feasibility: {{feasibility}}
+      Demo Scenario: {{demo_scenario}}
+      Existing: {{existing}}
+      Notes: {{notes}}
+
+      Instructions:
+      1. Design the simplest architecture that proves the concept
+      2. Choose a repo location: /home/adam/projects/<name>/
+      3. Break the build into ordered stories (max 10 for a POC)
+      4. Each story must fit in ONE context window
+      5. Focus on the happy path — skip auth, error handling, polish
+      6. The POC should be demoable in under 5 minutes
+
+      Rules:
+      - MINIMAL. Cut everything that isn't needed to prove the concept.
+      - Working > Pretty. Console output beats a UI if it proves the point.
+      - Each story includes acceptance criteria and test criteria.
+
+      Reply with:
+      STATUS: done
+      REPO: /home/adam/projects/<name>
+      BRANCH: main
+      ARCHITECTURE: brief description of the approach
+      STORIES_JSON: [ ... array of story objects ... ]
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: setup
+    agent: setup
+    input: |
+      Prepare the development environment for this POC.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      TECH_STACK: {{tech_stack}}
+      ARCHITECTURE: {{architecture}}
+
+      Instructions:
+      1. Create the repo directory if it doesn't exist
+      2. Initialize the project (git init, package.json, tsconfig, etc.)
+      3. Install dependencies based on the tech stack
+      4. Verify the build works (even if empty)
+      5. Create a README.md with the POC description
+
+      Reply with:
+      STATUS: done
+      BUILD_CMD: <build command>
+      TEST_CMD: <test command>
+      RUN_CMD: <how to run the POC>
+      BASELINE: <baseline status>
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: implement
+    agent: builder
+    type: loop
+    loop:
+      over: stories
+      completion: all_done
+      fresh_session: true
+      verify_each: true
+      verify_step: verify
+    input: |
+      Implement the following story for the POC. You are working on ONE story in a fresh session.
+
+      IDEA (overall):
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      BUILD_CMD: {{build_cmd}}
+      TEST_CMD: {{test_cmd}}
+      ARCHITECTURE: {{architecture}}
+
+      CURRENT STORY:
+      {{current_story}}
+
+      COMPLETED STORIES:
+      {{completed_stories}}
+
+      STORIES REMAINING: {{stories_remaining}}
+
+      VERIFY FEEDBACK (if retrying):
+      {{verify_feedback}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Instructions:
+      1. Read progress.txt if it exists
+      2. Pull latest on the branch
+      3. Implement this story only — keep it minimal, POC quality
+      4. Write basic tests to verify it works
+      5. Run build + tests
+      6. Commit with descriptive message
+      7. Update progress.txt
+
+      POC Rules:
+      - Working > perfect. Ship it.
+      - Skip edge cases, error handling, polish
+      - Hardcode config values — no env vars needed
+      - Console output is fine if it proves the concept
+
+      Reply with:
+      STATUS: done
+      CHANGES: what you implemented
+      TESTS: what tests you wrote
+    expects: "STATUS: done"
+    max_retries: 2
+    on_fail:
+      escalate_to: human
+
+  - id: verify
+    agent: verifier
+    input: |
+      Verify the builder's work on this story.
+
+      IDEA (overall):
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      CHANGES: {{changes}}
+      TEST_CMD: {{test_cmd}}
+
+      CURRENT STORY:
+      {{current_story}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Check:
+      1. Code exists (not just TODOs or placeholders)
+      2. Each acceptance criterion is met
+      3. Tests pass
+      4. Build passes
+
+      Reply with:
+      STATUS: done
+      VERIFIED: What you confirmed
+
+      Or if incomplete:
+      STATUS: retry
+      ISSUES:
+      - What's missing
+    expects: "STATUS: done"
+    on_fail:
+      retry_step: implement
+      max_retries: 2
+      on_exhausted:
+        escalate_to: human
+
+  - id: review
+    agent: reviewer
+    input: |
+      Final review of the POC. Test it end-to-end and write up results.
+
+      IDEA:
+      {{task}}
+
+      REPO: {{repo}}
+      BRANCH: {{branch}}
+      BUILD_CMD: {{build_cmd}}
+      TEST_CMD: {{test_cmd}}
+      RUN_CMD: {{run_cmd}}
+      DEMO_SCENARIO: {{demo_scenario}}
+      ARCHITECTURE: {{architecture}}
+
+      PROGRESS LOG:
+      {{progress}}
+
+      Instructions:
+      1. Pull latest and build
+      2. Run the full test suite
+      3. Run the POC and test the demo scenario
+      4. Write a brief verdict: does it prove the concept?
+
+      Reply with:
+      STATUS: done
+      VERDICT: works/partial/broken
+      DEMO_RESULT: what happened when you ran the demo scenario
+      SUMMARY: 3-5 sentence summary of what was built and whether it works
+      NEXT_STEPS: what would be needed to take this beyond POC
+    expects: "STATUS: done"
+    on_fail:
+      escalate_to: human

@@ -23,6 +23,7 @@ import { listBundledWorkflows } from "../installer/workflow-fetch.js";
 import { readRecentLogs } from "../lib/logger.js";
 import { getRecentEvents, getRunEvents, type AntfarmEvent } from "../installer/events.js";
 import { startDaemon, stopDaemon, getDaemonStatus, isRunning } from "../server/daemonctl.js";
+import { startSpawnerDaemon, stopSpawnerDaemon, getSpawnerStatus, getSpawnerLogFile } from "../daemon/daemonctl.js";
 import { claimStep, completeStep, failStep, getStories } from "../installer/step-ops.js";
 import { ensureCliSymlink } from "../installer/symlink.js";
 import { execSync } from "node:child_process";
@@ -99,6 +100,10 @@ function printUsage() {
       "antfarm dashboard [start] [--port N]   Start dashboard daemon (default: 3333)",
       "antfarm dashboard stop                  Stop dashboard daemon",
       "antfarm dashboard status                Check dashboard status",
+      "",
+      "antfarm spawner start [--interval N]   Start event-driven spawner daemon (default: 30s)",
+      "antfarm spawner stop                    Stop spawner daemon",
+      "antfarm spawner status                  Check spawner status",
       "",
       "antfarm step claim <agent-id>       Claim pending step, output resolved input as JSON",
       "antfarm step complete <step-id>      Complete step (reads output from stdin)",
@@ -257,6 +262,49 @@ async function main() {
     const result = await startDaemon(port);
     console.log(`Dashboard started (PID ${result.pid})`);
     console.log(`  http://localhost:${result.port}`);
+    return;
+  }
+
+  if (group === "spawner") {
+    const sub = args[1];
+
+    if (sub === "stop") {
+      if (stopSpawnerDaemon()) {
+        console.log("Spawner daemon stopped.");
+      } else {
+        console.log("Spawner daemon is not running.");
+      }
+      return;
+    }
+
+    if (sub === "status") {
+      const st = getSpawnerStatus();
+      if (st.running) {
+        console.log(`Spawner daemon running (PID ${st.pid})`);
+        console.log(`  Log: ${getSpawnerLogFile()}`);
+      } else {
+        console.log("Spawner daemon is not running.");
+      }
+      return;
+    }
+
+    // start (explicit or implicit)
+    let intervalMs = 30000;
+    const intIdx = args.indexOf("--interval");
+    if (intIdx !== -1 && args[intIdx + 1]) {
+      intervalMs = parseInt(args[intIdx + 1], 10) * 1000 || 30000;
+    }
+
+    const st = getSpawnerStatus();
+    if (st.running) {
+      console.log(`Spawner daemon already running (PID ${st.pid})`);
+      return;
+    }
+
+    const result = await startSpawnerDaemon(intervalMs);
+    console.log(`Spawner daemon started (PID ${result.pid})`);
+    console.log(`  Poll interval: ${intervalMs / 1000}s`);
+    console.log(`  Log: ${getSpawnerLogFile()}`);
     return;
   }
 
@@ -513,18 +561,43 @@ async function main() {
 
   if (action === "run") {
     let notifyUrl: string | undefined;
+    let scheduler: "cron" | "daemon" | undefined;
     const runArgs = args.slice(3);
     const nuIdx = runArgs.indexOf("--notify-url");
     if (nuIdx !== -1) {
       notifyUrl = runArgs[nuIdx + 1];
       runArgs.splice(nuIdx, 2);
     }
+    const schedIdx = runArgs.indexOf("--scheduler");
+    if (schedIdx !== -1) {
+      scheduler = runArgs[schedIdx + 1] as "cron" | "daemon";
+      runArgs.splice(schedIdx, 2);
+    }
+    if (runArgs.includes("--use-daemon")) {
+      scheduler = "daemon";
+      runArgs.splice(runArgs.indexOf("--use-daemon"), 1);
+    }
     const taskTitle = runArgs.join(" ").trim();
     if (!taskTitle) { process.stderr.write("Missing task title.\n"); printUsage(); process.exit(1); }
-    const run = await runWorkflow({ workflowId: target, taskTitle, notifyUrl });
+    const run = await runWorkflow({ workflowId: target, taskTitle, notifyUrl, scheduler });
     process.stdout.write(
       [`Run: ${run.id}`, `Workflow: ${run.workflowId}`, `Task: ${run.task}`, `Status: ${run.status}`].join("\n") + "\n",
     );
+
+    // If daemon scheduler, ensure spawner is running
+    if (scheduler === "daemon") {
+      const st = getSpawnerStatus();
+      if (!st.running) {
+        try {
+          const result = await startSpawnerDaemon();
+          console.log(`Spawner daemon started (PID ${result.pid})`);
+        } catch (err) {
+          console.log(`Warning: Could not start spawner: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      } else {
+        console.log(`Spawner daemon already running (PID ${st.pid})`);
+      }
+    }
     return;
   }
 
