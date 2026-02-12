@@ -27,3 +27,62 @@ Started: 2026-02-11 05:47 ET
 - Files changed: `tests/ant.test.ts` (new)
 - **Learnings:** Node 22 runs .ts files directly with type stripping; tests in `tests/` use this approach
 ---
+
+## 2026-02-11 15:02 - US-002: Apply type scale tokens to header and column headers
+- Replaced hard-coded font-size values with CSS custom property tokens in 5 rules
+- header h1: 22px → var(--text-xl)
+- select: 14px → var(--text-md)
+- .column-header: 13px → var(--text-base), letter-spacing .5px → .6px
+- .column-header .count: 11px → var(--text-xs)
+- .refresh-note: 11px → var(--text-sm)
+- Files changed: src/server/index.html
+- **Learnings:** All CSS is minified on single lines; search by selector name not line structure
+---
+
+## 2026-02-11 15:07 - US-003: Apply type scale tokens to card styles
+- Replaced hard-coded font-size in .card-title (13px → var(--text-base)), added line-height: var(--leading-tight)
+- Replaced .card-meta font-size (11px → var(--text-sm))
+- Replaced .badge font-size (10px → var(--text-xs))
+- Replaced .empty font-size (12px → var(--text-sm))
+- Files changed: src/server/index.html
+- **Learnings:** Card styles are all single-line minified CSS rules; straightforward token substitution
+---
+
+## 2026-02-11 15:17 - US-004: Apply type scale tokens to panel and step styles
+- Replaced hard-coded font-size in 6 rules with CSS custom property tokens:
+  - .panel h2: 16px → var(--text-lg)
+  - .panel-task: 13px → var(--text-base), line-height 1.5 → var(--leading-relaxed)
+  - .panel-meta: 12px → var(--text-sm)
+  - .step-name: 13px → var(--text-base)
+  - .step-agent: 11px → var(--text-sm)
+  - .panel-close: 20px → var(--text-xl)
+- Files changed: src/server/index.html
+- **Learnings:** Panel and step styles follow same pattern as cards — straightforward token swap
+---
+
+## 2026-02-11 16:22 - US-006: Apply font-weight tokens and add base body line-height
+- Added line-height: var(--leading-normal) to body rule
+- Replaced hard-coded font-weight: 600 with var(--font-semibold) in: header h1, .column-header, .panel h2, .step-status, .badge
+- Replaced hard-coded font-weight: 500 with var(--font-medium) in: .card-title, .step-name
+- Files changed: src/server/index.html
+- **Learnings:** All 8 replacements were straightforward find-and-replace in the minified CSS lines
+---
+
+## 2026-02-11 16:42 - US-007: Tokenize inline styles in JS-generated HTML
+- Replaced font-size:12px → var(--text-sm) in loadActivity rows
+- Replaced font-size:15px → var(--text-lg) for h3 in both loadActivity and loadStories
+- Replaced font-size:13px → var(--text-base) for story progress counter
+- Replaced gap:12px → var(--space-md), padding:4px → var(--space-xs) in activity rows
+- Replaced margin-top:24px → var(--space-xl), margin-bottom:12px → var(--space-md) in both panels
+- Files changed: src/server/index.html
+- **Learnings:** JS template literals in loadStories/loadActivity contain significant inline styles; story detail section still has hardcoded 12px/11px/10px that could be tokenized in a future pass
+---
+
+## 2026-02-11 16:53 - US-008: Final polish — card title truncation and consistent mono sizing
+- Removed font-weight 700 from Google Fonts link (kept 400, 500, 600)
+- Changed .card-title from single-line ellipsis to -webkit-line-clamp: 2 multi-line truncation
+- Added gap: var(--space-sm) to .card-meta
+- Replaced bare pixel font-size values: .step-status (11px→var(--text-xs)), .theme-toggle (16px→var(--text-lg)), .step-icon (12px→var(--text-sm))
+- Files changed: src/server/index.html
+- **Learnings:** All bare pixel font-sizes in the style block are now tokenized
+---
