@@ -69,6 +69,7 @@ export async function setupAgentCrons(workflow: WorkflowSpec): Promise<void> {
       agentId,
       payload: { kind: "agentTurn", message: prompt, timeoutSeconds },
       enabled: true,
+      delivery: { mode: "none" }, // FIX: Agents communicate via step API, not message delivery
     });
 
     if (!result.ok) {
